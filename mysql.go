@@ -57,9 +57,13 @@ func nextToken(l *Lexer) (*Token, error) {
 		return tokenFactory(_plus, nil), nil
 	case '-':
 		{
+			l.Next()
 			// FIXME => Doesn't work for negative numbers
 			if unicode.IsDigit(l.Peek()) {
 				return tokenizeNumber(l)
+			} else if l.Peek() == '-' {
+				tokenizeComment(l, false)
+				return nil, nil
 			} else {
 				return tokenFactory(_minus, nil), nil
 			}
@@ -68,7 +72,18 @@ func nextToken(l *Lexer) (*Token, error) {
 	case '*':
 		return tokenFactory(_star, nil), nil // Also Kleene Star
 	case '/':
-		return tokenFactory(_div, nil), nil
+		{
+			l.Next()
+			switch l.Peek() {
+			case '*':
+				tokenizeComment(l, true)
+				return nil, nil
+			default:
+				return tokenFactory(_div, nil), nil
+			}
+
+		}
+
 	case '%':
 		return tokenFactory(_mod, nil), nil
 	case '=':
@@ -160,6 +175,39 @@ func nextToken(l *Lexer) (*Token, error) {
 	return nil, nil
 }
 
+func tokenizeComment(l *Lexer, isMultiLineComment bool) {
+
+	if isMultiLineComment == false {
+		for {
+			nextChar := l.Peek()
+
+			if nextChar == '\n' || nextChar == _eof {
+				return
+			}
+
+			l.Next()
+		}
+	} else {
+		for {
+
+			nextChar := l.Next()
+
+			switch nextChar {
+			case '*':
+				{
+					if l.Peek() == '/' {
+						return
+					}
+				}
+			case _eof:
+				return
+			}
+
+		}
+	}
+
+}
+
 func tokenizeDoubleQuote(l *Lexer) (*Token, error) {
 
 	var sb strings.Builder
@@ -228,7 +276,7 @@ func tokenizeIdentifier(l *Lexer) (*Token, error) {
 		// we have a terminating condition
 		if !idStart(x) || x == _eof {
 
-			l.Rewind()
+			l.Rewind() // FIXME
 
 			data, ok := root.Get(temp)
 

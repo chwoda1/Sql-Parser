@@ -6,5 +6,4 @@
 		* Multi-Dialect Support
 
 ## TODO
-	* Comment lexing
 	* Parser Needs to be Implemented

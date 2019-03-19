@@ -242,6 +242,220 @@ func TestOperatorQuery(t *testing.T) {
 	}
 }
 
+var testCommentQuery = &Lexer{
+	name:       "commentLexer",
+	input:      "SELECT * FROM atableidentifier WHERE 1 = /* asdfasdfasdfasdfasdfasdf */1;",
+	start:      0,
+	pos:        0,
+	width:      1,
+	tokens:     make(chan Token),
+	SqlDialect: CreatePostgres(),
+}
+
+var commentResult = []struct {
+	token uint
+	input string
+}{
+	{uint(_select), "SELECT"},
+	{uint(_star), "STAR"},
+	{uint(_from), "FROM"},
+	{uint(_identifier), "IDENTIFIER"},
+	{uint(_where), "WHERE"},
+	{uint(_number), "NUMBER"},
+	{uint(_equal), "EQUAL"},
+	{uint(_number), "NUMBER"},
+	{uint(_semi), "SEMICOLON"},
+}
+
+func TestCommentQuery(t *testing.T) {
+
+	result := make([]Token, 0)
+
+	go func() {
+		err := Yylex(testCommentQuery)
+
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	for {
+		x := <-testCommentQuery.tokens
+
+		if x.Type == _eof {
+			break
+		}
+
+		result = append(result, x)
+	}
+
+	for i := 0; i < len(result); i++ {
+		t.Run(commentResult[i].input, func(t *testing.T) {
+			assert.Equal(t, commentResult[i].token, result[i].Type)
+		})
+	}
+}
+
+var testNefariousComment = &Lexer{
+	name:       "commentLexer",
+	input:      "SELECT * FROM atableidentifier WHERE 1 = /* asdfasdfasdfas////dfa*sdfasdf */1;",
+	start:      0,
+	pos:        0,
+	width:      1,
+	tokens:     make(chan Token),
+	SqlDialect: CreatePostgres(),
+}
+
+var nefariousResult = []struct {
+	token uint
+	input string
+}{
+	{uint(_select), "SELECT"},
+	{uint(_star), "STAR"},
+	{uint(_from), "FROM"},
+	{uint(_identifier), "IDENTIFIER"},
+	{uint(_where), "WHERE"},
+	{uint(_number), "NUMBER"},
+	{uint(_equal), "EQUAL"},
+	{uint(_number), "NUMBER"},
+	{uint(_semi), "SEMICOLON"},
+}
+
+func TestNefariousCommentQuery(t *testing.T) {
+
+	result := make([]Token, 0)
+
+	go func() {
+		err := Yylex(testNefariousComment)
+
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	for {
+		x := <-testNefariousComment.tokens
+
+		if x.Type == _eof {
+			break
+		}
+
+		result = append(result, x)
+	}
+
+	for i := 0; i < len(result); i++ {
+		t.Run(nefariousResult[i].input, func(t *testing.T) {
+			assert.Equal(t, nefariousResult[i].token, result[i].Type)
+		})
+	}
+}
+
+var testLineCommentQuery = &Lexer{
+	name: "commentLexer",
+	input: "SELECT * FROM atableidentifier WHERE --SELECT * anothertable\n" +
+		"1 = 1;",
+	start:      0,
+	pos:        0,
+	width:      1,
+	tokens:     make(chan Token),
+	SqlDialect: CreatePostgres(),
+}
+
+var lineCommentResult = []struct {
+	token uint
+	input string
+}{
+	{uint(_select), "SELECT"},
+	{uint(_star), "STAR"},
+	{uint(_from), "FROM"},
+	{uint(_identifier), "IDENTIFIER"},
+	{uint(_where), "WHERE"},
+	{uint(_number), "NUMBER"},
+	{uint(_equal), "EQUAL"},
+	{uint(_number), "NUMBER"},
+	{uint(_semi), "SEMICOLON"},
+}
+
+func TestLineComment(t *testing.T) {
+
+	result := make([]Token, 0)
+
+	go func() {
+		err := Yylex(testLineCommentQuery)
+
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	for {
+		x := <-testLineCommentQuery.tokens
+
+		if x.Type == _eof {
+			break
+		}
+
+		result = append(result, x)
+	}
+
+	for i := 0; i < len(result); i++ {
+		t.Run(lineCommentResult[i].input, func(t *testing.T) {
+			assert.Equal(t, lineCommentResult[i].token, result[i].Type)
+		})
+	}
+}
+
+var testFullTokens = &Lexer{
+	name:       "fullTokenLexer",
+	input:      "SELECT * FROM asdf LIMIT 5003823283",
+	start:      0,
+	pos:        0,
+	width:      1,
+	tokens:     make(chan Token),
+	SqlDialect: CreatePostgres(),
+}
+
+var fullTokenResult = []struct {
+	token Token
+	input string
+}{
+	{Token{_select, nil}, "SELECT"},
+	{Token{_star, nil}, "STAR"},
+	{Token{_from, nil}, "FROM"},
+	{Token{_identifier, "asdf"}, "IDENTIFIER"},
+	{Token{_limit, nil}, "LIMIT"},
+	{Token{_number, "5003823283"}, "NUMBER"},
+}
+
+func TestFullToken(t *testing.T) {
+
+	result := make([]Token, 0)
+
+	go func() {
+		err := Yylex(testFullTokens)
+
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	for {
+		x := <-testFullTokens.tokens
+
+		if x.Type == _eof {
+			break
+		}
+
+		result = append(result, x)
+	}
+
+	for i := 0; i < len(result); i++ {
+		t.Run(fullTokenResult[i].input, func(t *testing.T) {
+			assert.Equal(t, fullTokenResult[i].token, result[i])
+		})
+	}
+}
+
 // Benchmarks
 var benchOperatorQuery = &Lexer{
 	name: "testLexer",
@@ -257,7 +471,7 @@ var benchOperatorQuery = &Lexer{
 	SqlDialect: CreatePostgres(),
 }
 
-func BenchmarkSqlParse(b *testing.B) {
+func xBenchmarkSqlParse(b *testing.B) {
 
 	b.ReportAllocs()
 
